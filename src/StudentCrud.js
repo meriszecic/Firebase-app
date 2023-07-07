@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import firebase from './firebase';
 
+
 const StudentCrud = () => {
   const [students, setStudents] = useState([]);
   const [name, setName] = useState('');
@@ -8,10 +9,25 @@ const StudentCrud = () => {
   const [age, setAge] = useState('');
   const [editMode, setEditMode] = useState(false);
   const [editId, setEditId] = useState('');
+  const[image, setImage] = useState('');
+  const [createdAt, setCreatedAt] = useState(String(new Date().toJSON().slice(0, 10)));
+  const [createdBy, setCreatedBy] = useState('');
+  const [lastEditor, setLastEditor] = useState('not edited yet');
+
+
+
+  const [user,setUser] = useState(null);
+
 
   useEffect(() => {
     const database = firebase.database();
     const studentsRef = database.ref('students');
+
+    const unsubscribe = firebase.auth().onAuthStateChanged((user) => {
+      setUser(user);
+      setCreatedBy(user.displayName);
+    });
+
 
     studentsRef.on('value', (snapshot) => {
       const studentData = snapshot.val();
@@ -22,7 +38,8 @@ const StudentCrud = () => {
     });
 
     return () => {
-      studentsRef.off(); 
+      studentsRef.off();
+      unsubscribe(); 
     };
   }, []);
 
@@ -34,15 +51,23 @@ const StudentCrud = () => {
       [`${name} ${surname}`]: {
         name,
         surname,
-        age
+        age,
+        createdBy,
+        image,
+        createdAt,
+        lastEditor
       }
     };
   
     if (editMode) {
-      studentsRef.child(editId).update(newStudent, (error) => {
+      studentsRef.child(editId).update({age: `${age}`, name: `${name}`, surname: `${surname}`, image: image, lastEditor: user.displayName}, (error) => {
         if (error) {
           console.error('Error updating student:', error);
         } else {
+          setImage('');
+          setCreatedAt('');
+          setCreatedBy('');
+          setLastEditor('not edited yet');
           setName('');
           setSurname('');
           setAge('');
@@ -58,6 +83,7 @@ const StudentCrud = () => {
           setName('');
           setSurname('');
           setAge('');
+          setImage('');
         }
       });
     }
@@ -81,6 +107,8 @@ const StudentCrud = () => {
     setAge(student.age);
     setEditMode(true);
     setEditId(student.id);
+    setImage(student.image);
+    setLastEditor(user.displayName)
   };
 
   return (
@@ -88,19 +116,24 @@ const StudentCrud = () => {
       <h1>Student CRUD</h1>
       <div>
         <input type="text" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
+        <input type="text" placeholder="img url" value={image} onChange={(e) => setImage(e.target.value)} />
+
         <input type="text" placeholder="Surname" value={surname} onChange={(e) => setSurname(e.target.value)} />
         <input type="number" placeholder="Age" value={age} onChange={(e) => setAge(e.target.value)} />
         <button onClick={addStudent}>{editMode ? 'Update Student' : 'Add Student'}</button>
       </div>
-      <ul>
+
         {students.map((student) => (
-          <li key={student.id}>
-            {student.name} {student.surname}, Age: {student.age}
+          <div style={{marginBottom:'50px', marginTop:'50px'}} key={student.id}>
+            <b>{student.name} {student.surname}, Age: {student.age}</b><br></br>
+            <img src={student.image} width="250px" alt='slika studenta'/><br></br>
+            <p>Student created at: <b>{student.createdAt}</b></p> 
+           <p>Student created by: <b>{student.createdBy}</b></p>
+            <p>Last edited by: <b>{student.lastEditor}</b></p>
             <button onClick={() => editStudent(student)}>Edit</button>
             <button onClick={() => deleteStudent(student.id)}>Delete</button>
-          </li>
+          </div>
         ))}
-      </ul>
     </div>
   );
 };
